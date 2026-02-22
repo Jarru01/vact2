@@ -61,7 +61,7 @@ Resources:
     Properties:
       VpcId: !Ref Vpc
       InternetGatewayId: !Ref InternetGateway
-###########################################################################################
+##########################################################################################
   PublicSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
