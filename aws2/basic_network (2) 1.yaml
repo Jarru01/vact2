@@ -222,13 +222,15 @@ Resources:
         RouteTableId: !Ref PrivateRouteTableA
         DestinationCidrBlock: '0.0.0.0/0'
         NatGatewayId: !Ref NATGatewayA
-
-  #RoutetoSecondaryVPC:
-  #  Type: AWS::EC2::Route
-  #  Properties:
-  #      RouteTableId: !Ref PrivateRouteTableA
-  #      DestinationCidrBlock: '10.222.0.0/16'
-  #      VpcPeeringConnectionId: pcx-0a2736dfb088925e4       
+        
+#pri initial stack creationu zakomentovat
+  RoutetoSecondaryVPC:
+    Type: AWS::EC2::Route
+    Properties:
+        RouteTableId: !Ref PrivateRouteTableA
+        DestinationCidrBlock: '10.222.0.0/16'
+        VpcPeeringConnectionId: pcx-08a6370084589e3d7 # toto sa meni(id) ale pri initial 
+      
 
   DefaultRouteB:
     DependsOn: NATGatewayB
