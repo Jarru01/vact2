@@ -21,7 +21,7 @@ Parameters:
   ImageId:
     Description: AMI (Amazon Machine Image) ID
     Type: String
-    Default: ami-006dcf34c09e50022
+    Default: ami-0f3caa1cf4417e51b
 
   InstanceType:
     Description: Instance type (number of vCPUs, memory, bandwidth, etc.)
