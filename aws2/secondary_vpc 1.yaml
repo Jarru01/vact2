@@ -1,3 +1,5 @@
+#nezabudnut spravne nastavit networkstackname default: na spravny parent name stacku
+
 AWSTemplateFormatVersion: 2010-09-09
 
 Description: secondary vpc
@@ -36,7 +38,7 @@ Parameters:
   NetworkStackName:
     Description: Name of parent network CloudFormation stack
     Type: String
-    Default: basic-network
+    Default: lab-vpcs #stack name
 
   PublicSubnetCidrBlock:
     Description: Cidr block number
