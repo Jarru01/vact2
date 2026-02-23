@@ -31,7 +31,7 @@ Parameters:
   IamInstanceProfileName:
     Description: Instance IAM profile name
     Type: String
-    Default: c76725a1578383l3609849t1w787370517204-SsmRoleInstanceProfile-40bcP8gOEOix    
+    Default: c201421a5141573l13826754t1w745863548161-SsmRoleInstanceProfile-5WpgWSn5BfRU    
 
   NetworkStackName:
     Description: Name of parent network CloudFormation stack
