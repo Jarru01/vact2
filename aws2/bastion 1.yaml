@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Cvicenie 3 - bastion and private instance
+
+
+Parameters:
+  Project:
+    Description: Project
+    Type: String
+    Default: FRI
+
+  Environment:
+    Description: Environment
+    Type: String
+    Default: lab
+
+  NetworkStackName:
+    Description: Name of parent network CloudFormation stack
+    Type: String
+    Default: basic-nwk
+
+  ImageId:
+    Description: AMI (Amazon Machine Image) ID
+    Type: String
+    Default: ami-07761f3ae34c4478d #ami-006dcf34c09e50022
+
+  InstanceType:
+    Description: Instance type (number of vCPUs, memory, bandwidth, etc.)
+    Type: String
+    Default: t3.medium
+
+  IamInstanceProfileName:
+    Description: Instance IAM profile name
+    Type: String
+    Default: c112506a2668173l5905494t1w211125648860-SsmRoleInstanceProfile-utPaS8a9sLhY #c76725a1578383l3609849t1w787370517204-SsmRoleInstanceProfile-40bcP8gOEOix
+
+
+Resources:
+
+  SSHKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: SSHKeyPair
+      KeyType: rsa
+      Tags:
+        - Key: Name
+          Value: SSHKeyPair
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref Project
+
+  SecurityGroupForBastion:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SecurityGroup for bastion
+      VpcId:
+        Fn::ImportValue: !Sub ${NetworkStackName}-VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 22,   ToPort: 22,   CidrIp: 158.193.138.31/32, Description: Home IP - SSH }
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 22,  ToPort: 22,  CidrIp: { Fn::ImportValue: !Sub '${NetworkStackName}-VpcCidr' }, Description: SSH - VPC }
+      Tags:
+        - { Key: Name, Value: Bastion_SG }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project, Value: !Ref Project }
+
+  BastionA:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PublicSubnetAId"
+      SecurityGroupIds:
+        - !Ref SecurityGroupForBastion
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref SSHKeyPair
+      IamInstanceProfile: !Ref IamInstanceProfileName
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+
+            echo 1 > /proc/sys/net/ipv4/ip_forward
+
+            echo "Hello world."
+            echo "This instance was created in environment ${Environment} in region ${AWS::Region}"
+
+          - Environment: !Ref Environment
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 30
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: BastionA
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref Project
+
+#####################################################################
+#####################################################################          
+  SSHKeyPairPrivate:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: SSHKeyPairPrivate
+      KeyType: rsa
+      Tags:
+        - Key: Name
+          Value: SSHKeyPairPrivate
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref Project
+
+  PrivateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private Security Group
+      VpcId:
+        Fn::ImportValue: !Sub ${NetworkStackName}-VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 22,   ToPort: 22,   CidrIp:  { Fn::ImportValue: !Sub '${NetworkStackName}-VpcCidr' }, Description: Home IP - SSH }
+        - { IpProtocol: icmp, FromPort: -1,   ToPort: -1,   CidrIp:  10.222.0.0/16, Description: icmp }     
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 443,  ToPort: 443,  CidrIp: 0.0.0.0/0, Description: HTTPS }
+        - { IpProtocol: icmp, FromPort: -1,   ToPort: -1,   CidrIp:  10.222.0.0/16, Description: icmp }        
+      Tags:
+        - { Key: Name, Value: PrivateSG }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project, Value: !Ref Project }        
+
+
+  PrivateInstanceA:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PrivateSubnetAId"
+      SecurityGroupIds:
+        - !Ref PrivateSecurityGroup
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref SSHKeyPairPrivate
+      IamInstanceProfile: !Ref IamInstanceProfileName
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+
+            echo 1 > /proc/sys/net/ipv4/ip_forward
+
+            echo "Hello world."
+            echo "This instance was created in environment ${Environment} in region ${AWS::Region}"
+
+          - Environment: !Ref Environment
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 30
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: PrivateInstance
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref Project
