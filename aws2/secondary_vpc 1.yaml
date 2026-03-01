@@ -38,7 +38,7 @@ Parameters:
   NetworkStackName:
     Description: Name of parent network CloudFormation stack
     Type: String
-    Default: lab-vpcs #stack name
+    Default: basic-network #stack name
 
   PublicSubnetCidrBlock:
     Description: Cidr block number
