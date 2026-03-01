@@ -1,0 +1,37 @@
+1️⃣ Bastion Access
+
+Problem: EC2 Instance Connect failed (Failed to connect)
+
+Cause: Security Group for Bastion only allowed SSH from your home IP → AWS EC2 Instance Connect couldn’t reach it.
+
+Fix: Temporarily allow SSH (port 22) from 0.0.0.0/0 or use Session Manager.
+
+2️⃣ Ping Primary Private Instance (10.20.x.x)
+
+Problem: ping from Bastion → PrivateInstance failed.
+
+Cause: Security Group of PrivateInstance (PrivateSecurityGroup) did not allow ICMP from VPC CIDR.
+
+Fix: Add ICMP inbound rule for primary VPC CIDR (10.20.0.0/16).
+
+3️⃣ Ping Secondary VPC Instance (10.222.x.x)
+
+Problem: ping failed even after ICMP allowed.
+
+Cause: Bastion is in PublicSubnetA, which uses PublicRouteTable, which had no route to 10.222.0.0/16 (secondary VPC).
+
+Fix 1 (Routing): Add route in PublicRouteTable:
+v basic_network pridana sekcia:
+  #kvoli Bastion → PrivateInstance_secondaryVPC
+  RouteToSecondaryFromPublic:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 10.222.0.0/16
+      VpcPeeringConnectionId: pcx-01442bbf41129f759  # peering ID
+
+
+4️⃣ Final Result
+
+Bastion → PrivateInstance (primary) ✅
+Bastion → PrivateInstance_secondaryVPC ✅
