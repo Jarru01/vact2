@@ -30,7 +30,7 @@ Parameters:
   OurPublicIp:
     Description: Our source public IPv4 address
     Type: String
-    Default: '158.193.138.31/32'
+    Default: '158.193.130.154/32'
 
   ImageId:
     Description: AMI (Amazon Machine Image) ID
@@ -52,9 +52,121 @@ Parameters:
     Type: String
     # it's unique in each account. can be found in IAM service as AmazonSSMRoleForInstancesQuickSetup (part of Instance profile ARN)
     # e.g. c76725a1578383l3622172t1w333290784692-SsmRoleInstanceProfile-apue5UBzE6mA
+    Default: c201421a5141573l13826754t1w745863548161-SsmRoleInstanceProfile-BxS4oOW3Yq7g
 
 
 Resources:
-###########################################################################
-### Part 1 - security groups (firewall) & SSH key pair
-###########################################################################
+  ###########################################################################
+  ### Part 1 - security groups (firewall) & SSH key pair
+  ###########################################################################
+  SSHKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub "${Project}-${Environment}-keypair"
+      KeyType: rsa
+      KeyFormat: pem
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-${Environment}-keypair"
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+
+  SecurityGroupForPublicInstances:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for public-facing instances (SSH from our IP only, outbound HTTP/HTTPS)
+      VpcId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref OurPublicIp
+          Description: SSH access from our public IP
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: Allow outbound HTTP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Allow outbound HTTPS
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-${Environment}-public-sg"
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+
+  SecurityGroupForPrivateInstances:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for private instances (SSH+HTTP from VPC CIDR only, outbound HTTP/HTTPS)
+      VpcId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp:
+            Fn::ImportValue: !Sub "${NetworkStackName}-VpcCidr"
+          Description: SSH from within VPC
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp:
+            Fn::ImportValue: !Sub "${NetworkStackName}-VpcCidr"
+          Description: HTTP from within VPC
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: Allow outbound HTTP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Allow outbound HTTPS
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-${Environment}-private-sg"
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+  ###########################################################################
+  ### Part 2 - testovacia verejná EC2 instance
+  ###########################################################################
+
+  PublicInstanceA:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref SSHKeyPair
+      IamInstanceProfile: !Ref IamInstanceProfileName
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PublicSubnetAId"
+      SecurityGroupIds:
+        - !Ref SecurityGroupForPublicInstances
+      AvailabilityZone: !Select [0, !GetAZs '']
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 8
+            VolumeType: gp3
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${Project}-${Environment}-public-instance-A"
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
