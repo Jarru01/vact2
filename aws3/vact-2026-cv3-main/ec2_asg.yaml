@@ -136,7 +136,7 @@ Resources:
 
 ###########################################################################
 ### Part 3 - EC2 auto-scaling & load balancing
-###########################################################################
+##########################################################################
 
   # AWS docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-elasticloadbalancingv2-loadbalancer.html
   PublicApplicationLoadBalancer:

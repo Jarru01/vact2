@@ -9,7 +9,7 @@ Description: Cvicenie 3 - EC2 instances & auto-scaling & load-balancing
 # pseudo parameters: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/pseudo-parameter-reference.html
 # pseudo attributes: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-product-attribute-reference.html
 # template sections: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
-###########################################################################
+##########################################################################
 
 Parameters:
   Project:
