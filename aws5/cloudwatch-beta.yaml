@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudWatch alarm and scaling policy for Private Auto Scaling Group
+
+Resources:
+
+  PrivateASGScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: PrivateAutoScalingGroup
+      ScalingAdjustment: 2
+      Cooldown: 60
+
+  PrivateASGHighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Alarm if CPU > 90% for 60 seconds
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Statistic: Average
+      Period: 30
+      EvaluationPeriods: 2
+      Threshold: 90
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: PrivateAutoScalingGroup
+      AlarmActions:
+        - !Ref PrivateASGScaleUpPolicy

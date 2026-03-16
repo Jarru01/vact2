@@ -1,0 +1,195 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Cvicenie 3 - EC2 instances & auto-scaling & load-balancing
+
+###########################################################################
+# Useful CloudFormation docs
+###########################################################################
+# functions:         https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference.html
+# pseudo parameters: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/pseudo-parameter-reference.html
+# pseudo attributes: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-product-attribute-reference.html
+# template sections: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/template-anatomy.html
+##########################################################################
+
+Parameters:
+  Project:
+    Description: Project
+    Type: String
+    Default: FRI
+
+  Environment:
+    Description: Environment
+    Type: String
+    Default: lab
+
+  NetworkStackName:
+    Description: Name of parent network CloudFormation stack (without .yaml suffix)
+    Type: String
+    Default: basic-network
+
+  OurPublicIp:
+    Description: Our source public IPv4 address
+    Type: String
+    Default: '158.193.138.31/32'
+
+  ImageId:
+    Description: AMI (Amazon Machine Image) ID
+    Type: String
+    # more info: https://docs.amazonaws.cn/en_us/AWSEC2/latest/UserGuide/finding-an-ami.html
+    # list of usable AMIs can be found in AWS console -> EC2 -> AMI Catalog
+    # Amazon Linux 2023 64-bit x86 (HVM), Kernel 6.1, SSD Volume Type, us-east-1
+    Default: ami-0f3caa1cf4417e51b
+
+  InstanceType:
+    Description: Instance type (number of vCPUs, memory, bandwidth, etc.)
+    Type: String
+    # "t3" family = General purpose, Intel Xeon Platinum 8000 series; "small" size = 2 vCPUs, 2 GB memory
+    # more info: https://aws.amazon.com/ec2/instance-types/t3/
+    Default: t3.small
+
+  IamInstanceProfileName:
+    Description: Instance IAM profile name
+    Type: String
+    # it's unique in each account. can be found in IAM service as AmazonSSMRoleForInstancesQuickSetup (part of Instance profile ARN)
+    # e.g. c76725a1578383l3622172t1w333290784692-SsmRoleInstanceProfile-apue5UBzE6mA
+
+
+Resources:
+###########################################################################
+### Part 1 - security groups (firewall) & SSH key pair
+##########################################################################
+  SecurityGroupForPublicInstances:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SecurityGroup for instances in Public subnets
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref OurPublicIp, Description: 'SSH Public IP' }
+        - { IpProtocol: tcp, FromPort: 2222, ToPort: 2223, CidrIp: !Ref OurPublicIp, Description: 'SSH Public IP' }
+        - { IpProtocol: tcp, FromPort: 8080, ToPort: 8081, CidrIp: !Ref OurPublicIp, Description: 'HTTP Public IP' }
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: 'HTTPS all' }
+        - { IpProtocol: tcp, FromPort: 80,  ToPort: 80,  CidrIp: 0.0.0.0/0, Description: 'HTTP all' }
+        - { IpProtocol: tcp, FromPort: 22,  ToPort: 22,  CidrIp: { Fn::ImportValue: !Sub '${NetworkStackName}-VpcCidr' }, Description: 'SSH VPC' }
+      VpcId:
+        Fn::ImportValue: !Sub '${NetworkStackName}-VpcId'
+
+  SecurityGroupForPrivateInstances:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SecurityGroup for instances in Private subnets
+      VpcId:
+        Fn::ImportValue: !Sub ${NetworkStackName}-VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: { Fn::ImportValue: !Sub '${NetworkStackName}-VpcCidr' }, Description: 'HTTP VPC' }
+        - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: { Fn::ImportValue: !Sub '${NetworkStackName}-VpcCidr' }, Description: 'SSH VPC' }
+      SecurityGroupEgress:
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: 'HTTPS all' }
+        - { IpProtocol: tcp, FromPort: 80,  ToPort: 80,  CidrIp: 0.0.0.0/0, Description: 'HTTP all' }
+
+  SSHKeyPair:
+    Type: 'AWS::EC2::KeyPair'
+    Properties:
+      KeyName: SSHKeyPair
+      KeyType: rsa
+###########################################################################
+### Part 2- static EC2 instances
+###########################################################################
+
+  # AWS docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html
+  PublicInstanceA:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PublicSubnetAId"
+      SecurityGroupIds:
+        - !Ref SecurityGroupForPublicInstances
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref SSHKeyPair
+      IamInstanceProfile: !Ref IamInstanceProfileName
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+
+          echo 1 > /proc/sys/net/ipv4/ip_forward
+
+          yum -y update
+          yum -y install iptables-services
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 30
+            Encrypted: true
+
+
+  PrivateInstanceA:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PrivateSubnetAId"
+      SecurityGroupIds:
+        - !Ref SecurityGroupForPrivateInstances
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref SSHKeyPair
+      IamInstanceProfile: !Ref IamInstanceProfileName
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+
+          yum -y update
+          yum -y install httpd
+
+          systemctl enable httpd
+          systemctl start httpd
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 30
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: PrivateInstanceA
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref Project
+
+  PrivateInstanceB:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PrivateSubnetBId"
+      SecurityGroupIds:
+        - !Ref SecurityGroupForPrivateInstances
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref SSHKeyPair
+      IamInstanceProfile: !Ref IamInstanceProfileName
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+
+          yum -y update
+          yum -y install httpd
+
+          systemctl enable httpd
+          systemctl start httpd
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 30
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: PrivateInstanceB
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref Project

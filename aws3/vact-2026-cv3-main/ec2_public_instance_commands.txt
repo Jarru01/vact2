@@ -1,6 +1,0 @@
-iptables -t nat -A PREROUTING -i ens5 -p tcp --dport 2222 -j DNAT --to-destination 10.20.11.xxx:22
-iptables -t nat -A PREROUTING -i ens5 -p tcp --dport 8080 -j DNAT --to-destination 10.20.11.xxx:80
-iptables -t nat -A PREROUTING -i ens5 -p tcp --dport 2223 -j DNAT --to-destination 10.20.12.xxx:22
-iptables -t nat -A PREROUTING -i ens5 -p tcp --dport 8081 -j DNAT --to-destination 10.20.12.xxx:80
-
-iptables -t nat -A POSTROUTING -o ens5 -j MASQUERADE
