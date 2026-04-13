@@ -70,7 +70,7 @@ resources:
         sysctl -p
 
         # Enable NAT (important!)
-        iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+        iptables -t nat -A POSTROUTING -o ens3 -j MASQUERADE
 
   # ----------------------
   # WEB SERVER VM
