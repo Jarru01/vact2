@@ -1,0 +1,94 @@
+heat_template_version: 2018-08-31
+
+description: Router VM + internal web server with restricted security
+
+parameters:
+  external_net:
+    type: string
+    default: ext-net-154
+
+resources:
+
+  # ----------------------
+  # Internal network
+  # ----------------------
+  internal_net:
+    type: OS::Neutron::Net
+    properties:
+      name: net-is2
+
+  internal_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: subnet-is2
+      network_id: { get_resource: internal_net }
+      cidr: 10.0.1.0/24
+      ip_version: 4
+      gateway_ip: 10.0.1.1
+
+  # ----------------------
+  # Security group
+  # ----------------------
+  sec_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: sg-secure
+      rules:
+        # SSH only from UNIZA
+        - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+          remote_ip_prefix: 158.193.0.0/16
+
+        # HTTP (web server)
+        - protocol: tcp
+          port_range_min: 80
+          port_range_max: 80
+
+        # ICMP
+        - protocol: icmp
+
+  # ----------------------
+  # ROUTER VM
+  # ----------------------
+  router_vm:
+    type: OS::Nova::Server
+    properties:
+      name: router-vm
+      image: debian-12-kis
+      flavor: 1c05r8d
+      availability_zone: nova
+      networks:
+        - network: { get_param: external_net }   # external
+        - network: { get_resource: internal_net } # internal
+      security_groups: [ { get_resource: sec_group } ]
+      user_data_format: RAW
+      user_data: |
+        #!/bin/bash
+        # Enable routing
+        echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+        sysctl -p
+
+        # Enable NAT (important!)
+        iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+  # ----------------------
+  # WEB SERVER VM
+  # ----------------------
+  web_vm:
+    type: OS::Nova::Server
+    properties:
+      name: web-vm
+      image: debian-12-kis
+      flavor: 1c05r8d
+      availability_zone: nova
+      networks:
+        - network: { get_resource: internal_net }
+      security_groups: [ { get_resource: sec_group } ]
+      user_data_format: RAW
+      user_data: |
+        #!/bin/bash
+        apt update
+        apt install -y apache2
+        systemctl enable apache2
+        systemctl start apache2
