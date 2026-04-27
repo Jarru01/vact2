@@ -10,7 +10,7 @@ terraform {
 
 provider "openstack" {
   user_name           = "vact4"
-  tenant_name         = "vact2_0"
+  tenant_name         = "vact2_4"
   password            = "vact"
   insecure            = "true"
   auth_url            = "https://158.193.152.44:5000/v3/"
